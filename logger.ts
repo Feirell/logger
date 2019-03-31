@@ -1,4 +1,19 @@
 import chalk, { Chalk } from 'chalk';
+
+// UTIL
+
+const isPrototype = (inst: object) => inst === inst.constructor.prototype;
+
+const getConstructor = (inst: Function | object) => {
+    if (typeof inst == 'function')
+        return inst;
+
+    if (isPrototype(inst))
+        return inst.constructor;
+
+    return Object.getPrototypeOf(inst).constructor;
+};
+
 const split = /[a-z][A-Z]/g;
 
 const formatNumber = (n: number, l = 2) => n.toString().padStart(l, '0');
@@ -34,8 +49,9 @@ export class Logger {
     }
 
     /**
-     * The part is either log, info, debug, warn, error or prefix.
-     * The color parts should be 0 to 255
+     * Sets the color for the tag infront of the actual massage.
+     * part is either log, info, debug, warn, error or prefix.
+     * The color needs to be an integer in the range of 0 to 255.
      */
     setColor(part: string, r: number, g: number, b: number) {
         part = '' + part;
@@ -92,17 +108,29 @@ export class Logger {
 
 const instanceTracker = new WeakMap();
 
-const isPrototype = (inst: object) => inst === inst.constructor.prototype;
+const getAndIncreateInstanceCounter = (target: any) => {
+    if (!instanceTracker.has(target)) {
+        instanceTracker.set(target, 0);
+        return 0;
+    } else {
+        const instanceNumber = instanceTracker.get(target) + 1;
+        instanceTracker.set(target, instanceNumber);
+        return instanceNumber;
+    }
+}
 
-const getConstructor = (inst: Function | object) => {
-    if (typeof inst == 'function')
-        return inst;
+export function applyOnTarget(target: any, propertyname: string, options = {
+    useInstanceNumber: true
+}) {
+    const isStatic = isPrototype(target) || typeof target === 'function';
+    const constructor = getConstructor(target);
 
-    if (isPrototype(inst))
-        return inst.constructor;
+    const name = constructor.name;
+    const instanceNumber = isStatic ? undefined : getAndIncreateInstanceCounter(target);
 
-    return Object.getPrototypeOf(inst).constructor;
-};
+    const logger = new Logger(name, options.useInstanceNumber ? instanceNumber : undefined);
+    Object.defineProperty(target, propertyname, { value: logger, enumerable: false });
+}
 
 /**
  * This function is a decorator which can be used on attributes.
@@ -120,36 +148,7 @@ const getConstructor = (inst: Function | object) => {
  ```
  */
 export function Log(...decoratorArgs: any[]) {
-    return function (target: any, propertyname: string) {
-        // target is either a prototype or the constructor function, hopefully they will offer a way of
-        // accessing the actual instance (one could with getter and some workaround but you should not)
-        const isStatic = isPrototype(target) || typeof target === 'function';
-        const constructor = getConstructor(target);
-
-        // if (!isStatic && !instanceTracker.has(target))
-        //     instanceTracker.set(target, 0);
-
-        const name = constructor.name;
-
-        // const nr = isStatic ? undefined : instanceTracker.get(target) + 1;
-        // instanceTracker.set(target, nr);
-
-        const logger = new Logger(name, /*nr*/ undefined);
-        Object.defineProperty(target, propertyname, { value: logger });
-    };
+    // target is either a prototype or the constructor function, hopefully they will offer a way of
+    // accessing the actual instance (one could with getter and some workaround but you should not)
+    return applyOnTarget;
 }
-
-class Example {
-    @Log()
-    private logger!: Logger;
-
-    constructor() {
-        this.logger.log('this is a log output');
-        this.logger.info('this is a info output');
-        this.logger.debug('this is a debug output');
-        this.logger.warn('this is a warn output');
-        this.logger.error('this is a error output');
-    }
-}
-
-new Example;
