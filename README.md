@@ -64,7 +64,7 @@ new Example();
 
 ## Constructor
 
-Or imperativly with the constructor:
+You can also create you own custom Logger instance with the Logger constructor.
 
 ```ts
 import { Logger } from 'logger';
