@@ -1,5 +1,5 @@
 {
-  "name": "logger-annotation",
+  "name": "logger",
   "version": "1.0.0",
   "main": "./lib/logger.js",
   "license": "MIT",
